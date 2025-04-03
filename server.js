@@ -3,6 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const wordList = require('./wordList'); // custom word-based game codes
+const questionPairs = require('./questionPairs');
 
 const PORT = process.env.PORT || 3000;
 
@@ -74,9 +75,10 @@ io.on('connection', (socket) => {
       playerIds.forEach(id => {
         const player = game.players[id];
         const role = player.isImposter ? 'imposter' : 'player';
-        const question = role === 'imposter'
-          ? "What's your favorite vegetable?"
-          : "What's your favorite fruit?";
+        // Pick a random question pair for the round
+        const pair = questionPairs[Math.floor(Math.random() * questionPairs.length)];
+        const question = role === 'imposter' ? pair.imposter : pair.player;
+
         io.to(id).emit('roleAssignment', {
           role,
           question,
