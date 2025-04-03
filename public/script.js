@@ -1,13 +1,14 @@
-// Connect to the server (supports both localhost and Render)
+// Connect to the correct server (local or Render)
 const socket = io(window.location.origin);
 
-// UI Elements
+// UI elements
 const createBtn = document.getElementById('createGameBtn');
 const joinBtn = document.getElementById('joinGameBtn');
 const startBtn = document.getElementById('startGameBtn');
 const backBtn = document.getElementById('backButton');
 
 const gameCodeInput = document.getElementById('gameCodeInput');
+const nameInput = document.getElementById('nameInput');
 const gameInfo = document.getElementById('gameInfo');
 const gameSection = document.getElementById('gameSection');
 const questionDisplay = document.getElementById('questionDisplay');
@@ -28,8 +29,14 @@ createBtn.addEventListener('click', () => {
 
 joinBtn.addEventListener('click', () => {
   const code = gameCodeInput.value.trim().toUpperCase();
-  if (!code) return alert("Enter a game code!");
-  socket.emit('joinGame', code, (response) => {
+  const name = nameInput.value.trim();
+
+  if (!code || !name) {
+    alert("Please enter both your name and a game code!");
+    return;
+  }
+
+  socket.emit('joinGame', { code, name }, (response) => {
     if (response.success) {
       gameCode = code;
       isHost = false;
@@ -53,23 +60,25 @@ backBtn.addEventListener('click', () => {
   gameInfo.textContent = '';
   playerList.innerHTML = '';
   gameCodeInput.value = '';
+  nameInput.value = '';
   gameCode = '';
   isHost = false;
 });
 
-// Listen for role assignment
-socket.on('roleAssignment', ({ role, question }) => {
-  console.log('Received role assignment:', role, question);
-  questionDisplay.textContent = `You are a ${role.toUpperCase()} \nYour question: ${question}`;
+// Receive your role and question
+socket.on('roleAssignment', ({ role, question, name }) => {
+  console.log('Received role assignment:', role, question, name);
+  questionDisplay.textContent =
+    `${name}, you are a ${role.toUpperCase()} 🤫\nYour question: ${question}`;
 });
 
-// Update the player list when people join/leave
+// Update player list for everyone
 socket.on('playerListUpdate', (players) => {
-  const list = Object.values(players).map(p => `🧍 Player: ${p.id.slice(0, 5)}`);
+  const list = Object.values(players).map(p => `🧍 ${p.name || p.id.slice(0, 5)}`);
   playerList.innerHTML = list.join('<br>');
 });
 
-// Utility
+// Utility function
 function showGameSection(text) {
   menu.style.display = 'none';
   gameSection.style.display = 'block';

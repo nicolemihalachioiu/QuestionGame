@@ -2,22 +2,23 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const wordList = require('./wordList.js');
+const wordList = require('./wordList'); // custom word-based game codes
 
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
-let games = {}; // Stores game rooms and players
+let games = {}; // Tracks all active games
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
+  // Create a new game
   socket.on('createGame', (callback) => {
     let gameCode;
     do {
-        gameCode = wordList[Math.floor(Math.random() * wordList.length)];
-    } while (games[gameCode]); // ensure uniqueness
+      gameCode = wordList[Math.floor(Math.random() * wordList.length)];
+    } while (games[gameCode]); // avoid duplicate codes
 
     games[gameCode] = {
       host: socket.id,
@@ -25,32 +26,42 @@ io.on('connection', (socket) => {
     };
 
     socket.join(gameCode);
-    games[gameCode].players[socket.id] = { id: socket.id, isImposter: false };
+    games[gameCode].players[socket.id] = {
+      id: socket.id,
+      name: `Host-${socket.id.slice(0, 5)}`,
+      isImposter: false,
+    };
 
     io.to(gameCode).emit('playerListUpdate', games[gameCode].players);
     callback(gameCode);
   });
 
-  socket.on('joinGame', (gameCode, callback) => {
-    const game = games[gameCode];
+  // Join an existing game
+  socket.on('joinGame', ({ code, name }, callback) => {
+    const game = games[code];
     if (game) {
-      socket.join(gameCode);
-      game.players[socket.id] = { id: socket.id, isImposter: false };
-
-      io.to(gameCode).emit('playerListUpdate', game.players);
+      socket.join(code);
+      game.players[socket.id] = {
+        id: socket.id,
+        name: name || `Player-${socket.id.slice(0, 5)}`,
+        isImposter: false,
+      };
+      io.to(code).emit('playerListUpdate', game.players);
       callback({ success: true });
     } else {
       callback({ success: false, message: "Game not found." });
     }
   });
 
+  // Start the game and assign roles
   socket.on('startGame', (gameCode) => {
     const game = games[gameCode];
-    if (game) {
+    if (game && socket.id === game.host) {
       const playerIds = Object.keys(game.players);
       const imposterCount = 1;
       const imposters = [];
 
+      // Randomly choose imposters
       while (imposters.length < imposterCount && imposters.length < playerIds.length) {
         const rand = playerIds[Math.floor(Math.random() * playerIds.length)];
         if (!imposters.includes(rand)) {
@@ -59,28 +70,37 @@ io.on('connection', (socket) => {
         }
       }
 
+      // Send role and question to each player
       playerIds.forEach(id => {
-        const role = game.players[id].isImposter ? 'imposter' : 'player';
+        const player = game.players[id];
+        const role = player.isImposter ? 'imposter' : 'player';
         const question = role === 'imposter'
           ? "What's your favorite vegetable?"
           : "What's your favorite fruit?";
-        io.to(id).emit('roleAssignment', { role, question });
+        io.to(id).emit('roleAssignment', {
+          role,
+          question,
+          name: player.name
+        });
+        console.log(`Sent role to ${player.name} (${id}): ${role}`);
       });
     }
   });
 
+  // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
+    console.log('User disconnected:', socket.id);
     for (const gameCode in games) {
       const game = games[gameCode];
       if (game.players[socket.id]) {
         delete game.players[socket.id];
-        io.to(gameCode).emit('playerListUpdate', game.players);
 
-        // If the host leaves, remove the game
+        // If host leaves, remove the whole game
         if (socket.id === game.host) {
           delete games[gameCode];
-          console.log(`Game ${gameCode} closed - host disconnected`);
+          console.log(`Game ${gameCode} closed (host left)`);
+        } else {
+          io.to(gameCode).emit('playerListUpdate', game.players);
         }
         break;
       }
