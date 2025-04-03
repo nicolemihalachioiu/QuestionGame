@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
-let games = {}; // Stores game rooms and players
+let games = {};
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
@@ -38,7 +38,7 @@ io.on('connection', (socket) => {
     const game = games[gameCode];
     if (game) {
       const playerIds = Object.keys(game.players);
-      const imposterCount = 1; // for now
+      const imposterCount = 1;
       const imposters = [];
 
       while (imposters.length < imposterCount) {
@@ -61,7 +61,6 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
-    // cleanup can be added here
   });
 });
 

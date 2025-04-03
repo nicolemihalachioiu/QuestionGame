@@ -1,21 +1,48 @@
-const startButton = document.getElementById('startButton');
-const questionContainer = document.getElementById('questionContainer');
-const questionText = document.getElementById('questionText');
-const revealButton = document.getElementById('revealButton');
+const socket = io();
 
-const normalQuestion = "What's your favorite fruit?";
-const imposterQuestion = "What's your favorite vegetable?";
+const createBtn = document.getElementById('createGameBtn');
+const joinBtn = document.getElementById('joinGameBtn');
+const startBtn = document.getElementById('startGameBtn');
+const gameCodeInput = document.getElementById('gameCodeInput');
+const gameInfo = document.getElementById('gameInfo');
+const gameSection = document.getElementById('gameSection');
+const questionDisplay = document.getElementById('questionDisplay');
 
-let isImposter = false;
+let gameCode = '';
+let isHost = false;
 
-startButton.addEventListener('click', () => {
-  // Randomly assign imposter role
-  isImposter = Math.random() < 0.25; // 25% chance
-  questionContainer.style.display = 'block';
-  startButton.style.display = 'none';
+createBtn.addEventListener('click', () => {
+  socket.emit('createGame', (code) => {
+    gameCode = code;
+    isHost = true;
+    showGameSection(`Game created! Code: ${code}`);
+    startBtn.style.display = 'inline-block';
+  });
 });
 
-revealButton.addEventListener('click', () => {
-  questionText.textContent = isImposter ? imposterQuestion : normalQuestion;
-  revealButton.disabled = true;
+joinBtn.addEventListener('click', () => {
+  const code = gameCodeInput.value.trim().toUpperCase();
+  if (!code) return alert("Enter a game code!");
+  socket.emit('joinGame', code, (response) => {
+    if (response.success) {
+      gameCode = code;
+      showGameSection(`Joined game: ${code}`);
+    } else {
+      alert(response.message || "Could not join game.");
+    }
+  });
 });
+
+startBtn.addEventListener('click', () => {
+  socket.emit('startGame', gameCode);
+});
+
+socket.on('roleAssignment', ({ role, question }) => {
+  questionDisplay.textContent = `You are a ${role.toUpperCase()} 🤫\nYour question: ${question}`;
+});
+
+function showGameSection(text) {
+  document.getElementById('menu').style.display = 'none';
+  gameSection.style.display = 'block';
+  gameInfo.textContent = text;
+}

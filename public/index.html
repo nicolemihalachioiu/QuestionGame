@@ -1,20 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Imposter Game</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Question Game</h1>
-  <button id="startButton">Start Game</button>
-  <div id="questionContainer" style="display: none;">
-    <p id="questionText"></p>
-    <button id="revealButton">Reveal Role</button>
+  <h1>🕵️‍♂️ Imposter Game</h1>
+
+  <div id="menu">
+    <button id="createGameBtn">Create Game</button>
+    <input type="text" id="gameCodeInput" placeholder="Enter Game Code"/>
+    <button id="joinGameBtn">Join Game</button>
   </div>
-  <script src="script.js"></script>
+
+  <div id="gameSection" style="display: none;">
+    <p id="gameInfo"></p>
+    <button id="startGameBtn" style="display: none;">Start Game</button>
+    <p id="questionDisplay"></p>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
- 
