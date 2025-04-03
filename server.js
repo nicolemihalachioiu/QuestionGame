@@ -14,27 +14,27 @@ io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   // Create a new game
-  socket.on('createGame', (callback) => {
+  socket.on('createGame', (name, callback) => {
     let gameCode;
     do {
       gameCode = wordList[Math.floor(Math.random() * wordList.length)];
     } while (games[gameCode]); // avoid duplicate codes
-
+  
     games[gameCode] = {
       host: socket.id,
       players: {},
     };
-
+  
     socket.join(gameCode);
     games[gameCode].players[socket.id] = {
       id: socket.id,
-      name: `Host-${socket.id.slice(0, 5)}`,
+      name: name || `Host-${socket.id.slice(0, 5)}`,
       isImposter: false,
     };
-
+  
     io.to(gameCode).emit('playerListUpdate', games[gameCode].players);
     callback(gameCode);
-  });
+  });  
 
   // Join an existing game
   socket.on('joinGame', ({ code, name }, callback) => {

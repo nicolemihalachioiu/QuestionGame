@@ -19,7 +19,13 @@ let gameCode = '';
 let isHost = false;
 
 createBtn.addEventListener('click', () => {
-  socket.emit('createGame', (code) => {
+  const name = nameInput.value.trim();
+  if (!name) {
+    alert("Please enter your name to create a game!");
+    return;
+  }
+
+  socket.emit('createGame', name, (code) => {
     gameCode = code;
     isHost = true;
     showGameSection(`Game created! Code: ${code}`);
