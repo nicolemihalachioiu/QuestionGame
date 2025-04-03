@@ -56,10 +56,6 @@ module.exports = [
         imposter: "Who is most likely to go to jail in the group?"
     },
     {
-        player: "What country would you most like to visit?",
-        imposter: "What is the most dangerous country?"
-    },
-    {
         player: "What is a good age to have your first kid?",
         imposter: "At what age did you have your first kiss?"
     },
