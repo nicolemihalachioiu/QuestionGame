@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const wordList = require('./wordList.js');
 
 const PORT = process.env.PORT || 3000;
 
@@ -13,7 +14,11 @@ io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('createGame', (callback) => {
-    const gameCode = Math.random().toString(36).substr(2, 5).toUpperCase();
+    let gameCode;
+    do {
+        gameCode = wordList[Math.floor(Math.random() * wordList.length)];
+    } while (games[gameCode]); // ensure uniqueness
+
     games[gameCode] = {
       host: socket.id,
       players: {},

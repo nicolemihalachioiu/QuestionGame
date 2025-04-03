@@ -57,13 +57,13 @@ backBtn.addEventListener('click', () => {
   isHost = false;
 });
 
-// 🔥 Listen for role assignment
+// Listen for role assignment
 socket.on('roleAssignment', ({ role, question }) => {
   console.log('Received role assignment:', role, question);
-  questionDisplay.textContent = `You are a ${role.toUpperCase()} 🤫\nYour question: ${question}`;
+  questionDisplay.textContent = `You are a ${role.toUpperCase()} \nYour question: ${question}`;
 });
 
-// 🔥 Update the player list when people join/leave
+// Update the player list when people join/leave
 socket.on('playerListUpdate', (players) => {
   const list = Object.values(players).map(p => `🧍 Player: ${p.id.slice(0, 5)}`);
   playerList.innerHTML = list.join('<br>');
