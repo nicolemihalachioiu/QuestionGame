@@ -37,8 +37,25 @@ startBtn.addEventListener('click', () => {
   socket.emit('startGame', gameCode);
 });
 
+const backBtn = document.getElementById('backButton');
+
+backBtn.addEventListener('click', () => {
+  gameSection.style.display = 'none';
+  document.getElementById('menu').style.display = 'block';
+  startBtn.style.display = 'none';
+  questionDisplay.textContent = '';
+  gameCodeInput.value = '';
+  gameInfo.textContent = '';
+  gameCode = '';
+  isHost = false;
+});
+
 socket.on('roleAssignment', ({ role, question }) => {
   questionDisplay.textContent = `You are a ${role.toUpperCase()} 🤫\nYour question: ${question}`;
+  socket.on('playerListUpdate', (players) => {
+    const list = Object.values(players).map(p => `🧍 Player: ${p.id.slice(0, 5)}`);
+    document.getElementById('playerList').innerHTML = list.join('<br>');
+  });  
 });
 
 function showGameSection(text) {

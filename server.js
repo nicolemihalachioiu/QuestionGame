@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
-let games = {};
+let games = {}; // Stores game rooms and players
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
@@ -18,8 +18,11 @@ io.on('connection', (socket) => {
       host: socket.id,
       players: {},
     };
+
     socket.join(gameCode);
     games[gameCode].players[socket.id] = { id: socket.id, isImposter: false };
+
+    io.to(gameCode).emit('playerListUpdate', games[gameCode].players);
     callback(gameCode);
   });
 
@@ -28,6 +31,8 @@ io.on('connection', (socket) => {
     if (game) {
       socket.join(gameCode);
       game.players[socket.id] = { id: socket.id, isImposter: false };
+
+      io.to(gameCode).emit('playerListUpdate', game.players);
       callback({ success: true });
     } else {
       callback({ success: false, message: "Game not found." });
@@ -41,7 +46,7 @@ io.on('connection', (socket) => {
       const imposterCount = 1;
       const imposters = [];
 
-      while (imposters.length < imposterCount) {
+      while (imposters.length < imposterCount && imposters.length < playerIds.length) {
         const rand = playerIds[Math.floor(Math.random() * playerIds.length)];
         if (!imposters.includes(rand)) {
           imposters.push(rand);
@@ -61,6 +66,20 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
+    for (const gameCode in games) {
+      const game = games[gameCode];
+      if (game.players[socket.id]) {
+        delete game.players[socket.id];
+        io.to(gameCode).emit('playerListUpdate', game.players);
+
+        // If the host leaves, remove the game
+        if (socket.id === game.host) {
+          delete games[gameCode];
+          console.log(`Game ${gameCode} closed - host disconnected`);
+        }
+        break;
+      }
+    }
   });
 });
 
