@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
-let games = {}; // gameCode => { host, players, currentQuestionPair }
+let games = {}; // Stores all games by gameCode
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -25,6 +25,7 @@ io.on('connection', (socket) => {
       host: socket.id,
       players: {},
       currentQuestionPair: null,
+      lastImposterId: null,
     };
 
     socket.join(gameCode);
@@ -55,48 +56,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Host starts game
+  // Start first game (same logic as nextRound)
   socket.on('startGame', (gameCode) => {
-    const game = games[gameCode];
-    if (!game || socket.id !== game.host) return;
-  
-    const playerIds = Object.keys(game.players);
-    const imposterCount = 1;
-    const imposters = [];
-  
-    // 🔒 Only select question if it hasn't been set yet
-    if (!game.currentQuestionPair) {
-      const randomIndex = Math.floor(Math.random() * questionPairs.length);
-      const pair = questionPairs[randomIndex];
-      game.currentQuestionPair = pair;
-      console.log("🔒 Question pair for this round:", pair);
-    }
-  
-    const pair = game.currentQuestionPair;
-  
-    while (imposters.length < imposterCount && imposters.length < playerIds.length) {
-      const rand = playerIds[Math.floor(Math.random() * playerIds.length)];
-      if (!imposters.includes(rand)) {
-        imposters.push(rand);
-        game.players[rand].isImposter = true;
-      }
-    }
-  
-    playerIds.forEach(id => {
-      const player = game.players[id];
-      const role = player.isImposter ? 'imposter' : 'player';
-      const question = role === 'imposter' ? pair.imposter : pair.player;
-  
-      io.to(id).emit('roleAssignment', {
-        role,
-        question,
-        playerQuestion: pair.player,
-        name: player.name,
-      });
-  
-      console.log(`Sent to ${player.name} (${role}): ${question}`);
-    });
-  });  
+    handleRoundStart(gameCode, socket.id);
+  });
+
+  // Start next round
+  socket.on('nextRound', (gameCode) => {
+    handleRoundStart(gameCode, socket.id);
+  });
 
   // Host reveals player question
   socket.on('revealPlayerQuestion', (gameCode) => {
@@ -115,7 +83,7 @@ io.on('connection', (socket) => {
         delete game.players[socket.id];
         if (socket.id === game.host) {
           delete games[code];
-          console.log(`Game ${code} closed (host disconnected)`);
+          console.log(`❌ Game ${code} closed (host disconnected)`);
         } else {
           io.to(code).emit('playerListUpdate', game.players);
         }
@@ -124,6 +92,50 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// 🔁 Handles both first and future rounds
+function handleRoundStart(gameCode, starterSocketId) {
+  const game = games[gameCode];
+  if (!game || starterSocketId !== game.host) return;
+
+  const playerIds = Object.keys(game.players);
+  if (playerIds.length < 2) return;
+
+  // 🔄 Reset roles
+  Object.values(game.players).forEach(player => {
+    player.isImposter = false;
+  });
+
+  // 🧠 Pick a new question pair
+  const pair = questionPairs[Math.floor(Math.random() * questionPairs.length)];
+  game.currentQuestionPair = pair;
+
+  // 🎲 Pick new imposter (not same as last round)
+  let imposterCandidates = [...playerIds];
+  if (game.lastImposterId && playerIds.length > 1) {
+    imposterCandidates = playerIds.filter(id => id !== game.lastImposterId);
+  }
+
+  const newImposterId = imposterCandidates[Math.floor(Math.random() * imposterCandidates.length)];
+  game.players[newImposterId].isImposter = true;
+  game.lastImposterId = newImposterId;
+
+  // 🎯 Send role + question to each player
+  playerIds.forEach(id => {
+    const player = game.players[id];
+    const role = player.isImposter ? 'imposter' : 'player';
+    const question = role === 'imposter' ? pair.imposter : pair.player;
+
+    io.to(id).emit('roleAssignment', {
+      role,
+      question,
+      playerQuestion: pair.player,
+      name: player.name,
+    });
+
+    console.log(`🔁 Round started: ${player.name} (${role}) — ${question}`);
+  });
+}
 
 http.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

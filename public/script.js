@@ -6,6 +6,7 @@ const joinBtn = document.getElementById('joinGameBtn');
 const startBtn = document.getElementById('startGameBtn');
 const backBtn = document.getElementById('backButton');
 const revealBtn = document.getElementById('revealPlayerQuestionBtn');
+const nextRoundBtn = document.getElementById('nextRoundBtn');
 
 const gameCodeInput = document.getElementById('gameCodeInput');
 const nameInput = document.getElementById('nameInput');
@@ -47,32 +48,49 @@ joinBtn.addEventListener('click', () => {
   });
 });
 
-// Start game
+// Start first game
 startBtn.addEventListener('click', () => {
   if (isHost) socket.emit('startGame', gameCode);
 });
 
-// Receive role/question
+// Handle role/question assignment
 socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
   questionDisplay.innerHTML = `
     ${name}, here is your question:<br>
     <strong>${question}</strong>
   `;
+
+  // Reset reveal UI
+  playerQuestionReveal.style.display = 'none';
+  playerQuestionReveal.textContent = '';
+  nextRoundBtn.style.display = 'none';
+
   if (isHost) {
     revealBtn.style.display = 'inline-block';
   }
 });
 
-// Reveal player question
+// Handle reveal button
 revealBtn.addEventListener('click', () => {
   revealBtn.style.display = 'none';
   socket.emit('revealPlayerQuestion', gameCode);
 });
 
-// Display revealed question to everyone
+// Show revealed player question to everyone
 socket.on('playerQuestionRevealed', (question) => {
   playerQuestionReveal.style.display = 'block';
   playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
+  if (isHost) {
+    nextRoundBtn.style.display = 'inline-block';
+  }
+});
+
+// Host starts next round
+nextRoundBtn.addEventListener('click', () => {
+  socket.emit('nextRound', gameCode);
+  nextRoundBtn.style.display = 'none';
+  playerQuestionReveal.style.display = 'none';
+  questionDisplay.innerHTML = '';
 });
 
 // Player list updates
@@ -81,12 +99,13 @@ socket.on('playerListUpdate', (players) => {
   playerList.innerHTML = list.join('<br>');
 });
 
-// Back to menu
+// Back to main menu
 backBtn.addEventListener('click', () => {
   menu.style.display = 'block';
   gameSection.style.display = 'none';
   startBtn.style.display = 'none';
   revealBtn.style.display = 'none';
+  nextRoundBtn.style.display = 'none';
   playerQuestionReveal.style.display = 'none';
   questionDisplay.textContent = '';
   playerQuestionReveal.textContent = '';
