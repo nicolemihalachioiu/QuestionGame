@@ -26,6 +26,8 @@ io.on('connection', (socket) => {
       players: {},
       currentQuestionPair: null,
       lastImposterId: null,
+      usedPairs: [], 
+      round: 0 
     };
 
     socket.join(gameCode);
@@ -93,7 +95,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// 🔁 Handles both first and future rounds
+// Handles both first and future rounds
 function handleRoundStart(gameCode, starterSocketId) {
   const game = games[gameCode];
   if (!game || starterSocketId !== game.host) return;
@@ -101,16 +103,31 @@ function handleRoundStart(gameCode, starterSocketId) {
   const playerIds = Object.keys(game.players);
   if (playerIds.length < 2) return;
 
-  // 🔄 Reset roles
+  // Reset roles
   Object.values(game.players).forEach(player => {
     player.isImposter = false;
   });
 
-  // 🧠 Pick a new question pair
-  const pair = questionPairs[Math.floor(Math.random() * questionPairs.length)];
+  // Pick a new question pair
+  // Filter out used questions
+const availableIndexes = questionPairs
+.map((_, index) => index)
+.filter(i => !game.usedPairs.includes(i));
+
+if (availableIndexes.length === 0) {
+io.to(gameCode).emit('noMoreQuestions');
+return;
+}
+
+const randomIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
+game.usedPairs.push(randomIndex);
+const pair = questionPairs[randomIndex];
+game.currentQuestionPair = pair;
+game.round += 1;
+
   game.currentQuestionPair = pair;
 
-  // 🎲 Pick new imposter (not same as last round)
+  // Pick new imposter (not same as last round)
   let imposterCandidates = [...playerIds];
   if (game.lastImposterId && playerIds.length > 1) {
     imposterCandidates = playerIds.filter(id => id !== game.lastImposterId);
@@ -120,7 +137,7 @@ function handleRoundStart(gameCode, starterSocketId) {
   game.players[newImposterId].isImposter = true;
   game.lastImposterId = newImposterId;
 
-  // 🎯 Send role + question to each player
+  // Send role + question to each player
   playerIds.forEach(id => {
     const player = game.players[id];
     const role = player.isImposter ? 'imposter' : 'player';
@@ -133,7 +150,9 @@ function handleRoundStart(gameCode, starterSocketId) {
       name: player.name,
     });
 
-    console.log(`🔁 Round started: ${player.name} (${role}) — ${question}`);
+    io.to(game.host).emit('roundNumberUpdate', game.round);
+
+    console.log(`Round started: ${player.name} (${role}) — ${question}`);
   });
 }
 

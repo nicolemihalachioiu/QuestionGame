@@ -7,6 +7,7 @@ const startBtn = document.getElementById('startGameBtn');
 const backBtn = document.getElementById('backButton');
 const revealBtn = document.getElementById('revealPlayerQuestionBtn');
 const nextRoundBtn = document.getElementById('nextRoundBtn');
+const roundDisplay = document.getElementById('roundDisplay');
 
 const gameCodeInput = document.getElementById('gameCodeInput');
 const nameInput = document.getElementById('nameInput');
@@ -121,3 +122,17 @@ function showGameSection(text) {
   gameSection.style.display = 'block';
   gameInfo.textContent = text;
 }
+
+socket.on('roundNumberUpdate', (roundNum) => {
+  if (isHost) {
+    roundDisplay.style.display = 'block';
+    roundDisplay.textContent = `Round: ${roundNum}`;
+  }
+});
+
+socket.on('noMoreQuestions', () => {
+  if (isHost) {
+    alert("No more unused questions left! Game over 🎉");
+    nextRoundBtn.style.display = 'none';
+  }
+});
