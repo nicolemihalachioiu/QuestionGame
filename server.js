@@ -26,8 +26,8 @@ io.on('connection', (socket) => {
       players: {},
       currentQuestionPair: null,
       lastImposterId: null,
-      usedPairs: [], 
-      round: 0 
+      usedPairs: [],
+      round: 0
     };
 
     socket.join(gameCode);
@@ -58,17 +58,51 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Start first game (same logic as nextRound)
+  // Player rejoining game after disconnect
+  socket.on('rejoinGame', ({ code, name }) => {
+    const game = games[code];
+    if (!game) return;
+
+    const existingPlayer = Object.values(game.players).find(p => p.name === name);
+    if (existingPlayer) {
+      const oldId = existingPlayer.id;
+      existingPlayer.id = socket.id;
+      game.players[socket.id] = existingPlayer;
+      delete game.players[oldId];
+
+      socket.join(code);
+      io.to(code).emit('playerListUpdate', game.players);
+
+      const role = existingPlayer.isImposter ? 'imposter' : 'player';
+      const question = role === 'imposter'
+        ? game.currentQuestionPair?.imposter
+        : game.currentQuestionPair?.player;
+
+      if (game.currentQuestionPair && question) {
+        socket.emit('roleAssignment', {
+          role,
+          question,
+          playerQuestion: game.currentQuestionPair.player,
+          name: existingPlayer.name,
+        });
+
+        if (socket.id === game.host) {
+          socket.emit('roundNumberUpdate', game.round);
+        }
+      }
+    }
+  });
+
+  // Start first game or next round
   socket.on('startGame', (gameCode) => {
     handleRoundStart(gameCode, socket.id);
   });
 
-  // Start next round
   socket.on('nextRound', (gameCode) => {
     handleRoundStart(gameCode, socket.id);
   });
 
-  // Host reveals player question
+  // Host reveals the player question
   socket.on('revealPlayerQuestion', (gameCode) => {
     const game = games[gameCode];
     if (game && game.currentQuestionPair) {
@@ -76,7 +110,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnect
+  // Handle player disconnect
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     for (const code in games) {
@@ -108,26 +142,23 @@ function handleRoundStart(gameCode, starterSocketId) {
     player.isImposter = false;
   });
 
-  // Pick a new question pair
-  // Filter out used questions
-const availableIndexes = questionPairs
-.map((_, index) => index)
-.filter(i => !game.usedPairs.includes(i));
+  // Select unused question pair
+  const availableIndexes = questionPairs
+    .map((_, index) => index)
+    .filter(i => !game.usedPairs.includes(i));
 
-if (availableIndexes.length === 0) {
-io.to(gameCode).emit('noMoreQuestions');
-return;
-}
+  if (availableIndexes.length === 0) {
+    io.to(gameCode).emit('noMoreQuestions');
+    return;
+  }
 
-const randomIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
-game.usedPairs.push(randomIndex);
-const pair = questionPairs[randomIndex];
-game.currentQuestionPair = pair;
-game.round += 1;
-
+  const randomIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
+  game.usedPairs.push(randomIndex);
+  const pair = questionPairs[randomIndex];
   game.currentQuestionPair = pair;
+  game.round += 1;
 
-  // Pick new imposter (not same as last round)
+  // Choose new imposter
   let imposterCandidates = [...playerIds];
   if (game.lastImposterId && playerIds.length > 1) {
     imposterCandidates = playerIds.filter(id => id !== game.lastImposterId);
@@ -137,7 +168,10 @@ game.round += 1;
   game.players[newImposterId].isImposter = true;
   game.lastImposterId = newImposterId;
 
-  // Send role + question to each player
+  // Notify host of round #
+  io.to(game.host).emit('roundNumberUpdate', game.round);
+
+  // Send role and question to each player
   playerIds.forEach(id => {
     const player = game.players[id];
     const role = player.isImposter ? 'imposter' : 'player';
@@ -149,8 +183,6 @@ game.round += 1;
       playerQuestion: pair.player,
       name: player.name,
     });
-
-    io.to(game.host).emit('roundNumberUpdate', game.round);
 
     console.log(`Round started: ${player.name} (${role}) — ${question}`);
   });

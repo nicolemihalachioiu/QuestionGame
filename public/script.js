@@ -21,13 +21,29 @@ const menu = document.getElementById('menu');
 let gameCode = '';
 let isHost = false;
 
+// Rejoin game on page load
+window.addEventListener('load', () => {
+  const savedName = localStorage.getItem('playerName');
+  const savedCode = localStorage.getItem('gameCode');
+
+  if (savedName && savedCode) {
+    socket.emit('rejoinGame', { code: savedCode, name: savedName });
+    showGameSection(`Rejoining game: ${savedCode}`);
+  }
+});
+
 // Create game
 createBtn.addEventListener('click', () => {
   const name = nameInput.value.trim();
   if (!name) return alert("Enter your name to create a game!");
+
   socket.emit('createGame', name, (code) => {
     gameCode = code;
     isHost = true;
+
+    localStorage.setItem('playerName', name);
+    localStorage.setItem('gameCode', code);
+
     showGameSection(`Game created! Code: ${code}`);
     startBtn.style.display = 'inline-block';
   });
@@ -38,10 +54,15 @@ joinBtn.addEventListener('click', () => {
   const code = gameCodeInput.value.trim().toUpperCase();
   const name = nameInput.value.trim();
   if (!code || !name) return alert("Enter both a game code and your name.");
+
   socket.emit('joinGame', { code, name }, (response) => {
     if (response.success) {
       gameCode = code;
       isHost = false;
+
+      localStorage.setItem('playerName', name);
+      localStorage.setItem('gameCode', code);
+
       showGameSection(`Joined game: ${code}`);
     } else {
       alert(response.message || "Could not join game.");
@@ -49,19 +70,19 @@ joinBtn.addEventListener('click', () => {
   });
 });
 
-// Start first game
+// Start first round
 startBtn.addEventListener('click', () => {
   if (isHost) socket.emit('startGame', gameCode);
 });
 
-// Handle role/question assignment
+// Role/question assignment
 socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
   questionDisplay.innerHTML = `
     ${name}, here is your question:<br>
     <strong>${question}</strong>
   `;
 
-  // Reset reveal UI
+  // Reset round UI
   playerQuestionReveal.style.display = 'none';
   playerQuestionReveal.textContent = '';
   nextRoundBtn.style.display = 'none';
@@ -71,13 +92,12 @@ socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
   }
 });
 
-// Handle reveal button
+// Reveal player question to all
 revealBtn.addEventListener('click', () => {
   revealBtn.style.display = 'none';
   socket.emit('revealPlayerQuestion', gameCode);
 });
 
-// Show revealed player question to everyone
 socket.on('playerQuestionRevealed', (question) => {
   playerQuestionReveal.style.display = 'block';
   playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
@@ -86,7 +106,7 @@ socket.on('playerQuestionRevealed', (question) => {
   }
 });
 
-// Host starts next round
+// Next round
 nextRoundBtn.addEventListener('click', () => {
   socket.emit('nextRound', gameCode);
   nextRoundBtn.style.display = 'none';
@@ -94,13 +114,29 @@ nextRoundBtn.addEventListener('click', () => {
   questionDisplay.innerHTML = '';
 });
 
-// Player list updates
+// Update player list
 socket.on('playerListUpdate', (players) => {
   const list = Object.values(players).map(p => `🧍 ${p.name || p.id.slice(0, 5)}`);
   playerList.innerHTML = list.join('<br>');
 });
 
-// Back to main menu
+// Round counter
+socket.on('roundNumberUpdate', (roundNum) => {
+  if (isHost) {
+    roundDisplay.style.display = 'block';
+    roundDisplay.textContent = `Round: ${roundNum}`;
+  }
+});
+
+// Out of questions
+socket.on('noMoreQuestions', () => {
+  if (isHost) {
+    alert("No more unused questions left! Game over 🎉");
+    nextRoundBtn.style.display = 'none';
+  }
+});
+
+// 🔙 Back to menu
 backBtn.addEventListener('click', () => {
   menu.style.display = 'block';
   gameSection.style.display = 'none';
@@ -115,24 +151,14 @@ backBtn.addEventListener('click', () => {
   gameCodeInput.value = '';
   gameCode = '';
   isHost = false;
+
+  localStorage.removeItem('playerName');
+  localStorage.removeItem('gameCode');
 });
 
+// Show game area
 function showGameSection(text) {
   menu.style.display = 'none';
   gameSection.style.display = 'block';
   gameInfo.textContent = text;
 }
-
-socket.on('roundNumberUpdate', (roundNum) => {
-  if (isHost) {
-    roundDisplay.style.display = 'block';
-    roundDisplay.textContent = `Round: ${roundNum}`;
-  }
-});
-
-socket.on('noMoreQuestions', () => {
-  if (isHost) {
-    alert("No more unused questions left! Game over 🎉");
-    nextRoundBtn.style.display = 'none';
-  }
-});
