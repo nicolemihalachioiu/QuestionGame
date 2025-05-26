@@ -29,7 +29,6 @@ window.addEventListener('load', () => {
   if (savedName && savedCode) {
     rejoining = true;
 
-    // TEMPORARILY HIDE THE MENU while we wait to confirm rejoin
     menu.style.display = 'none';
     gameSection.style.display = 'none';
     gameInfo.textContent = `Rejoining game: ${savedCode}...`;
@@ -111,8 +110,27 @@ socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
   playerQuestionReveal.textContent = '';
   nextRoundBtn.style.display = 'none';
 
+  // Only check reveal status if host
   if (isHost) {
+    socket.emit('checkRevealStatus', gameCode);
+  }
+});
+
+// Handle reveal result
+socket.on('playerQuestionRevealed', (question) => {
+  playerQuestionReveal.style.display = 'block';
+  playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
+  if (isHost) {
+    nextRoundBtn.style.display = 'inline-block';
+  }
+});
+
+// Server tells host whether to show Reveal button
+socket.on('revealStatus', (wasRevealed) => {
+  if (isHost && !wasRevealed) {
     revealBtn.style.display = 'inline-block';
+  } else {
+    revealBtn.style.display = 'none';
   }
 });
 
@@ -121,15 +139,6 @@ socket.on('roundNumberUpdate', (roundNum) => {
   if (isHost) {
     roundDisplay.style.display = 'block';
     roundDisplay.textContent = `Round: ${roundNum}`;
-  }
-});
-
-// Question revealed to all
-socket.on('playerQuestionRevealed', (question) => {
-  playerQuestionReveal.style.display = 'block';
-  playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
-  if (isHost) {
-    nextRoundBtn.style.display = 'inline-block';
   }
 });
 
@@ -153,6 +162,21 @@ socket.on('rejoinFailed', () => {
   alert("Failed to rejoin the game. Please re-enter your name.");
   menu.style.display = 'block';
   gameSection.style.display = 'none';
+});
+
+// Rejoin success (sets host status)
+socket.on('rejoinSuccess', ({ name, code, isHost: wasHost }) => {
+  rejoining = false;
+  gameCode = code;
+  isHost = wasHost;
+
+  gameSection.style.display = 'block';
+  menu.style.display = 'none';
+  gameInfo.textContent = `Rejoined game: ${code}`;
+
+  if (isHost) {
+    startBtn.style.display = 'inline-block';
+  }
 });
 
 // Back to menu
@@ -183,16 +207,3 @@ function showGameSection(text) {
   gameSection.style.display = 'block';
   gameInfo.textContent = text;
 }
-
-socket.on('rejoinSuccess', ({ name, code, isHost: wasHost }) => {
-  rejoining = false;
-  gameCode = code;
-  isHost = wasHost;
-  gameSection.style.display = 'block';
-  menu.style.display = 'none';
-  gameInfo.textContent = `Rejoined game: ${code}`;
-
-  if (isHost) {
-    startBtn.style.display = 'inline-block';
-  }
-});
