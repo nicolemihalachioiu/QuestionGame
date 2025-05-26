@@ -6,7 +6,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    min-height: 100vh;
+    min-height: 80vh;
     padding: 40px 20px;
   }
 
@@ -33,7 +33,7 @@ body {
   }
 
   .input {
-    width: 95%;
+    width: 100%;
     padding: 10px;
     margin-bottom: 10px;
     font-size: 1rem;
