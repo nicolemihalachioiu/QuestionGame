@@ -6,8 +6,8 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 let games = {};
@@ -15,18 +15,18 @@ let games = {};
 io.on('connection', (socket) => {
   console.log('🟢 Connected:', socket.id);
 
-  // Create a new game
   socket.on('createGame', (name, callback) => {
     const code = generateGameCode();
     games[code] = {
       hostId: socket.id,
-      players: {}, // name -> { id, name }
+      players: {},
       currentRound: 1,
       currentQuestionPair: null,
       usedPairs: new Set(),
-      assignments: {}, // name -> { role, question, playerQuestion, name }
+      assignments: {},
       imposterName: null,
-      questionRevealed: false
+      questionRevealed: false,
+      gameStarted: false
     };
     games[code].players[name] = { id: socket.id, name };
     socket.join(code);
@@ -34,7 +34,6 @@ io.on('connection', (socket) => {
     io.to(code).emit('playerListUpdate', games[code].players);
   });
 
-  // Join an existing game
   socket.on('joinGame', ({ code, name }, callback) => {
     const game = games[code];
     if (!game) return callback({ success: false, message: "Game not found." });
@@ -46,14 +45,13 @@ io.on('connection', (socket) => {
     io.to(code).emit('playerListUpdate', game.players);
   });
 
-  // Start the game (first round)
   socket.on('startGame', (code) => {
     const game = games[code];
     if (!game) return;
+    game.gameStarted = true;
     startNewRound(game, code);
   });
 
-  // Move to the next round
   socket.on('nextRound', (code) => {
     const game = games[code];
     if (!game) return;
@@ -61,17 +59,24 @@ io.on('connection', (socket) => {
     startNewRound(game, code);
   });
 
-  // Reveal imposter question
   socket.on('revealPlayerQuestion', (code) => {
     const game = games[code];
-    if (game?.currentQuestionPair) {
+    if (game?.currentQuestionPair?.player) {
+      console.log('✅ Revealing PLAYER QUESTION:', game.currentQuestionPair.player);
       game.questionRevealed = true;
-      console.log(`🔍 Revealing player question for game ${code}: ${game.currentQuestionPair.imposter}`);
-      io.to(code).emit('playerQuestionRevealed', game.currentQuestionPair.imposter);
+      io.to(code).emit('playerQuestionRevealed', game.currentQuestionPair.player);
+    } else {
+      console.warn('❌ No current question pair to reveal');
     }
   });
 
-  // Rejoin a game
+  socket.on('checkRevealStatus', (code) => {
+    const game = games[code];
+    if (game) {
+      socket.emit('revealStatus', game.questionRevealed);
+    }
+  });
+
   socket.on('rejoinGame', ({ code, name }) => {
     const game = games[code];
     if (!game || !game.players[name]) {
@@ -90,7 +95,8 @@ io.on('connection', (socket) => {
     socket.emit('rejoinSuccess', {
       name,
       code,
-      isHost: game.hostId === socket.id
+      isHost: game.hostId === socket.id,
+      gameStarted: game.gameStarted
     });
 
     const assignment = game.assignments[name];
@@ -99,7 +105,7 @@ io.on('connection', (socket) => {
     }
 
     if (game.questionRevealed) {
-      socket.emit('playerQuestionRevealed', game.currentQuestionPair.imposter);
+      socket.emit('playerQuestionRevealed', game.currentQuestionPair.player);
     }
 
     io.to(code).emit('playerListUpdate', game.players);
@@ -107,18 +113,13 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('🔴 Disconnected:', socket.id);
-    // No cleanup to allow rejoining
-  });
-
-  socket.on('checkRevealStatus', (code) => {
-    const game = games[code];
-    if (game) {
-      socket.emit('revealStatus', game.questionRevealed);
-    }
   });
 });
 
-// Helper: start new round
+// =====================
+// Helpers
+// =====================
+
 function startNewRound(game, code) {
   const pair = getUnusedQuestionPair(game);
   if (!pair) {
@@ -126,7 +127,12 @@ function startNewRound(game, code) {
     return;
   }
 
-  game.currentQuestionPair = pair;
+  // ✅ Store correct pair
+  game.currentQuestionPair = {
+    player: pair.player,
+    imposter: pair.imposter
+  };
+
   game.questionRevealed = false;
   game.assignments = {};
 
@@ -135,14 +141,15 @@ function startNewRound(game, code) {
   game.imposterName = imposterName;
 
   playerNames.forEach(name => {
-    const role = name === imposterName ? 'imposter' : 'innocent';
-    const question = name === imposterName ? pair.imposter : pair.player;
-    const player = game.players[name];
+    const isImposter = name === imposterName;
+    const assignedQuestion = isImposter ? pair.imposter : pair.player;
+    const role = isImposter ? 'imposter' : 'innocent';
 
+    const player = game.players[name];
     game.assignments[name] = {
       role,
-      question,
-      playerQuestion: pair.imposter,
+      question: assignedQuestion,
+      playerQuestion: pair.player, // ✅ This is the real question
       name
     };
 
@@ -152,13 +159,11 @@ function startNewRound(game, code) {
   io.to(code).emit('roundNumberUpdate', game.currentRound);
 }
 
-// Generate 4-letter game code
 function generateGameCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-// Get unused question
 function getUnusedQuestionPair(game) {
   const allPairs = require('./questionPairs');
   const unused = allPairs.filter(pair =>

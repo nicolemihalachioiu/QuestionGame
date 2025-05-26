@@ -2,33 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Who's Lying?</title>
   <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&family=Luckiest+Guy&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h1>✨ Who's Lying? ✨</h1>
+  <div class="main-container">
+    <header>
+      <h1 class="fancy-title">Who's Lying? 🎭</h1>
+    </header>
 
-  <div id="menu">
-    <input type="text" id="nameInput" placeholder="Enter Your Name"/>
-    <button id="createGameBtn">Create Game</button>
-    <input type="text" id="gameCodeInput" placeholder="Enter Game Code"/>
-    <button id="joinGameBtn">Join Game</button>
-  </div>  
+    <section id="menu" class="panel">
+      <input id="nameInput" class="input" placeholder="Enter your name" />
+      <div class="form-row">
+        <button id="createGameBtn" class="btn primary">Create Game</button>
+        <input id="gameCodeInput" class="input" placeholder="Game Code" />
+        <button id="joinGameBtn" class="btn secondary">Join Game</button>
+      </div>
+    </section>
 
-  <div id="gameSection" style="display: none;">
-    <p id="gameInfo"></p>
-    <div id="playerList"></div>
-    <button id="startGameBtn" style="display: none;">Start Game</button>
-    <p id="questionDisplay"></p>
-    <button id="backButton">Back</button>
-    <button id="revealPlayerQuestionBtn" style="display: none;">Reveal Question</button>
-    <p id="playerQuestionReveal" style="display: none;"></p>
-    <button id="nextRoundBtn" style="display: none;">New Round</button>
-    <p id="roundDisplay" style="display:none;">Round: 1</p>
-  </div>  
+    <section id="gameSection" class="panel hidden">
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+      <div class="game-header">
+        <button id="backButton" class="btn exit-inline">← Exit Game</button>
+        <div id="gameInfo" class="status-text"></div>
+      </div>
+
+      <div id="playerList" class="player-list"></div>
+
+      <div id="roundDisplay" class="round-display"></div>
+      <div id="questionDisplay" class="question-box"></div>
+      <div id="playerQuestionReveal" class="reveal-box"></div>
+
+      <div class="button-row">
+        <button id="startGameBtn" class="btn primary" style="display: none;">Start Game</button>
+        <button id="revealPlayerQuestionBtn" class="btn warning" style="display: none;">Reveal Question</button>
+        <button id="nextRoundBtn" class="btn secondary" style="display: none;">Next Round</button>
+      </div>
+    </section>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+  </div>
 </body>
 </html>

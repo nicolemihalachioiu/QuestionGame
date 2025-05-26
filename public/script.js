@@ -78,6 +78,7 @@ joinBtn.addEventListener('click', () => {
 // Start first round
 startBtn.addEventListener('click', () => {
   if (isHost) socket.emit('startGame', gameCode);
+  startBtn.style.display = 'none';
 });
 
 // Reveal player question
@@ -119,7 +120,7 @@ socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
 // Handle reveal result
 socket.on('playerQuestionRevealed', (question) => {
   playerQuestionReveal.style.display = 'block';
-  playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
+  playerQuestionReveal.innerHTML = `<strong>Question:</strong> ${question}`;
   if (isHost) {
     nextRoundBtn.style.display = 'inline-block';
   }
@@ -175,7 +176,12 @@ socket.on('rejoinSuccess', ({ name, code, isHost: wasHost }) => {
   gameInfo.textContent = `Rejoined game: ${code}`;
 
   if (isHost) {
-    startBtn.style.display = 'inline-block';
+    if (gameStarted) {
+      startBtn.style.display = 'none'; 
+      roundDisplay.style.display = 'block'; 
+    } else {
+      startBtn.style.display = 'inline-block';
+    }
   }
 });
 
