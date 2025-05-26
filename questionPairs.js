@@ -134,9 +134,5 @@ module.exports = [
     { //34
         player: "Who's the chillest person in the group?",
         imposter: "Who's the most dramatic person in the group?"
-    },
-    { //35
-        player: "Who in the group would win a reality show?",
-        imposter: "Who would get voted off the island first?"
     }
   ];

@@ -1,193 +1,162 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+
 const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
-const wordList = require('./wordList');
-const questionPairs = require('./questionPairs');
+const server = http.createServer(app);
+const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(express.static('public'));
-
-let games = {}; // Stores all games by gameCode
+let games = {};
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('🟢 Connected:', socket.id);
 
-  // Host creates game
+  // Create a new game
   socket.on('createGame', (name, callback) => {
-    let gameCode;
-    do {
-      gameCode = wordList[Math.floor(Math.random() * wordList.length)];
-    } while (games[gameCode]);
-
-    games[gameCode] = {
-      host: socket.id,
-      players: {},
+    const code = generateGameCode();
+    games[code] = {
+      hostId: socket.id,
+      players: {}, // name -> { id, name }
+      currentRound: 1,
       currentQuestionPair: null,
-      lastImposterId: null,
-      usedPairs: [],
-      round: 0
+      usedPairs: new Set(),
+      assignments: {}, // name -> { role, question, playerQuestion, name }
+      imposterName: null,
     };
-
-    socket.join(gameCode);
-    games[gameCode].players[socket.id] = {
-      id: socket.id,
-      name: name || `Host-${socket.id.slice(0, 5)}`,
-      isImposter: false,
-    };
-
-    io.to(gameCode).emit('playerListUpdate', games[gameCode].players);
-    callback(gameCode);
+    games[code].players[name] = { id: socket.id, name };
+    socket.join(code);
+    callback(code);
+    io.to(code).emit('playerListUpdate', games[code].players);
   });
 
-  // Player joins game
+  // Join an existing game
   socket.on('joinGame', ({ code, name }, callback) => {
     const game = games[code];
-    if (game) {
-      socket.join(code);
-      game.players[socket.id] = {
-        id: socket.id,
-        name: name || `Player-${socket.id.slice(0, 5)}`,
-        isImposter: false,
-      };
-      io.to(code).emit('playerListUpdate', game.players);
-      callback({ success: true });
-    } else {
-      callback({ success: false, message: "Game not found." });
-    }
+    if (!game) return callback({ success: false, message: "Game not found." });
+    if (game.players[name]) return callback({ success: false, message: "Name already taken." });
+
+    game.players[name] = { id: socket.id, name };
+    socket.join(code);
+    callback({ success: true });
+    io.to(code).emit('playerListUpdate', game.players);
   });
 
-  // Player rejoining game after disconnect
-  socket.on('rejoinGame', ({ code, name }) => {
+  // Start the game (first round)
+  socket.on('startGame', (code) => {
     const game = games[code];
     if (!game) return;
+    startNewRound(game, code);
+  });
 
-    const existingPlayer = Object.values(game.players).find(p => p.name === name);
-    if (existingPlayer) {
-      const oldId = existingPlayer.id;
-      existingPlayer.id = socket.id;
-      game.players[socket.id] = existingPlayer;
-      delete game.players[oldId];
+  // Move to the next round
+  socket.on('nextRound', (code) => {
+    const game = games[code];
+    if (!game) return;
+    game.currentRound++;
+    startNewRound(game, code);
+  });
 
-      socket.join(code);
-      io.to(code).emit('playerListUpdate', game.players);
-
-      const role = existingPlayer.isImposter ? 'imposter' : 'player';
-      const question = role === 'imposter'
-        ? game.currentQuestionPair?.imposter
-        : game.currentQuestionPair?.player;
-
-      if (game.currentQuestionPair && question) {
-        socket.emit('roleAssignment', {
-          role,
-          question,
-          playerQuestion: game.currentQuestionPair.player,
-          name: existingPlayer.name,
-        });
-
-        if (socket.id === game.host) {
-          socket.emit('roundNumberUpdate', game.round);
-        }
-      }
+  // Reveal imposter question to everyone
+  socket.on('revealPlayerQuestion', (code) => {
+    const game = games[code];
+    if (game?.currentQuestionPair) {
+      io.to(code).emit('playerQuestionRevealed', game.currentQuestionPair.imposter);
     }
   });
 
-  // Start first game or next round
-  socket.on('startGame', (gameCode) => {
-    handleRoundStart(gameCode, socket.id);
-  });
-
-  socket.on('nextRound', (gameCode) => {
-    handleRoundStart(gameCode, socket.id);
-  });
-
-  // Host reveals the player question
-  socket.on('revealPlayerQuestion', (gameCode) => {
-    const game = games[gameCode];
-    if (game && game.currentQuestionPair) {
-      io.to(gameCode).emit('playerQuestionRevealed', game.currentQuestionPair.player);
+  // Rejoin a game after disconnect or refresh
+  socket.on('rejoinGame', ({ code, name }) => {
+    const game = games[code];
+    if (!game || !game.players[name]) {
+      socket.emit('rejoinFailed');
+      return;
     }
+
+    const wasHost = game.players[name].id === game.hostId;
+    game.players[name].id = socket.id;
+    socket.join(code);
+
+    // 🔄 Reassign hostId if this player was the host
+    if (wasHost) {
+      game.hostId = socket.id;
+    }
+
+    socket.emit('rejoinSuccess', {
+      name,
+      code,
+      isHost: game.hostId === socket.id
+    });
+
+    const assignment = game.assignments[name];
+    if (assignment) {
+      socket.emit('roleAssignment', assignment);
+    }
+
+    io.to(code).emit('playerListUpdate', game.players);
   });
 
-  // Handle player disconnect
+  // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    for (const code in games) {
-      const game = games[code];
-      if (game.players[socket.id]) {
-        delete game.players[socket.id];
-        if (socket.id === game.host) {
-          delete games[code];
-          console.log(`❌ Game ${code} closed (host disconnected)`);
-        } else {
-          io.to(code).emit('playerListUpdate', game.players);
-        }
-        break;
-      }
-    }
+    console.log('🔴 Disconnected:', socket.id);
+    // No cleanup: allow players to reconnect
   });
 });
 
-// Handles both first and future rounds
-function handleRoundStart(gameCode, starterSocketId) {
-  const game = games[gameCode];
-  if (!game || starterSocketId !== game.host) return;
-
-  const playerIds = Object.keys(game.players);
-  if (playerIds.length < 2) return;
-
-  // Reset roles
-  Object.values(game.players).forEach(player => {
-    player.isImposter = false;
-  });
-
-  // Select unused question pair
-  const availableIndexes = questionPairs
-    .map((_, index) => index)
-    .filter(i => !game.usedPairs.includes(i));
-
-  if (availableIndexes.length === 0) {
-    io.to(gameCode).emit('noMoreQuestions');
+// Helper to start a new round and assign questions
+function startNewRound(game, code) {
+  const pair = getUnusedQuestionPair(game);
+  if (!pair) {
+    io.to(code).emit('noMoreQuestions');
     return;
   }
 
-  const randomIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
-  game.usedPairs.push(randomIndex);
-  const pair = questionPairs[randomIndex];
   game.currentQuestionPair = pair;
-  game.round += 1;
+  game.assignments = {};
 
-  // Choose new imposter
-  let imposterCandidates = [...playerIds];
-  if (game.lastImposterId && playerIds.length > 1) {
-    imposterCandidates = playerIds.filter(id => id !== game.lastImposterId);
-  }
+  const playerNames = Object.keys(game.players);
+  const imposterName = playerNames[Math.floor(Math.random() * playerNames.length)];
+  game.imposterName = imposterName;
 
-  const newImposterId = imposterCandidates[Math.floor(Math.random() * imposterCandidates.length)];
-  game.players[newImposterId].isImposter = true;
-  game.lastImposterId = newImposterId;
+  playerNames.forEach(name => {
+    const role = name === imposterName ? 'imposter' : 'innocent';
+    const question = name === imposterName ? pair.imposter : pair.player;
+    const player = game.players[name];
 
-  // Notify host of round #
-  io.to(game.host).emit('roundNumberUpdate', game.round);
-
-  // Send role and question to each player
-  playerIds.forEach(id => {
-    const player = game.players[id];
-    const role = player.isImposter ? 'imposter' : 'player';
-    const question = role === 'imposter' ? pair.imposter : pair.player;
-
-    io.to(id).emit('roleAssignment', {
+    game.assignments[name] = {
       role,
       question,
-      playerQuestion: pair.player,
-      name: player.name,
-    });
+      playerQuestion: pair.imposter,
+      name
+    };
 
-    console.log(`Round started: ${player.name} (${role}) — ${question}`);
+    io.to(player.id).emit('roleAssignment', game.assignments[name]);
   });
+
+  io.to(code).emit('roundNumberUpdate', game.currentRound);
 }
 
-http.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Generate unique game code (e.g., 4 letters/numbers)
+function generateGameCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+// Get a random unused question pair
+function getUnusedQuestionPair(game) {
+  const allPairs = require('./questionPairs');
+  const unused = allPairs.filter(pair =>
+    !game.usedPairs.has(`${pair.player}|${pair.imposter}`)
+  );
+  if (unused.length === 0) return null;
+  const selected = unused[Math.floor(Math.random() * unused.length)];
+  game.usedPairs.add(`${selected.player}|${selected.imposter}`);
+  return selected;
+}
+
+server.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });

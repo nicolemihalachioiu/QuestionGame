@@ -18,17 +18,23 @@ const playerQuestionReveal = document.getElementById('playerQuestionReveal');
 const playerList = document.getElementById('playerList');
 const menu = document.getElementById('menu');
 
+let rejoining = false;
 let gameCode = '';
 let isHost = false;
 
-// Rejoin game on page load
 window.addEventListener('load', () => {
   const savedName = localStorage.getItem('playerName');
   const savedCode = localStorage.getItem('gameCode');
 
   if (savedName && savedCode) {
+    rejoining = true;
+
+    // TEMPORARILY HIDE THE MENU while we wait to confirm rejoin
+    menu.style.display = 'none';
+    gameSection.style.display = 'none';
+    gameInfo.textContent = `Rejoining game: ${savedCode}...`;
+
     socket.emit('rejoinGame', { code: savedCode, name: savedName });
-    showGameSection(`Rejoining game: ${savedCode}`);
   }
 });
 
@@ -75,35 +81,10 @@ startBtn.addEventListener('click', () => {
   if (isHost) socket.emit('startGame', gameCode);
 });
 
-// Role/question assignment
-socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
-  questionDisplay.innerHTML = `
-    ${name}, here is your question:<br>
-    <strong>${question}</strong>
-  `;
-
-  // Reset round UI
-  playerQuestionReveal.style.display = 'none';
-  playerQuestionReveal.textContent = '';
-  nextRoundBtn.style.display = 'none';
-
-  if (isHost) {
-    revealBtn.style.display = 'inline-block';
-  }
-});
-
-// Reveal player question to all
+// Reveal player question
 revealBtn.addEventListener('click', () => {
   revealBtn.style.display = 'none';
   socket.emit('revealPlayerQuestion', gameCode);
-});
-
-socket.on('playerQuestionRevealed', (question) => {
-  playerQuestionReveal.style.display = 'block';
-  playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
-  if (isHost) {
-    nextRoundBtn.style.display = 'inline-block';
-  }
 });
 
 // Next round
@@ -114,13 +95,28 @@ nextRoundBtn.addEventListener('click', () => {
   questionDisplay.innerHTML = '';
 });
 
-// Update player list
-socket.on('playerListUpdate', (players) => {
-  const list = Object.values(players).map(p => `🧍 ${p.name || p.id.slice(0, 5)}`);
-  playerList.innerHTML = list.join('<br>');
+// Role/question received
+socket.on('roleAssignment', ({ role, question, playerQuestion, name }) => {
+  rejoining = false;
+  gameSection.style.display = 'block';
+  menu.style.display = 'none';
+  gameInfo.textContent = `Rejoined game: ${localStorage.getItem('gameCode')}`;
+
+  questionDisplay.innerHTML = `
+    ${name}, here is your question:<br>
+    <strong>${question}</strong>
+  `;
+
+  playerQuestionReveal.style.display = 'none';
+  playerQuestionReveal.textContent = '';
+  nextRoundBtn.style.display = 'none';
+
+  if (isHost) {
+    revealBtn.style.display = 'inline-block';
+  }
 });
 
-// Round counter
+// Round number
 socket.on('roundNumberUpdate', (roundNum) => {
   if (isHost) {
     roundDisplay.style.display = 'block';
@@ -128,7 +124,16 @@ socket.on('roundNumberUpdate', (roundNum) => {
   }
 });
 
-// Out of questions
+// Question revealed to all
+socket.on('playerQuestionRevealed', (question) => {
+  playerQuestionReveal.style.display = 'block';
+  playerQuestionReveal.innerHTML = `<strong>Player Question:</strong> ${question}`;
+  if (isHost) {
+    nextRoundBtn.style.display = 'inline-block';
+  }
+});
+
+// No more questions left
 socket.on('noMoreQuestions', () => {
   if (isHost) {
     alert("No more unused questions left! Game over 🎉");
@@ -136,29 +141,58 @@ socket.on('noMoreQuestions', () => {
   }
 });
 
-// 🔙 Back to menu
-backBtn.addEventListener('click', () => {
-  menu.style.display = 'block';
-  gameSection.style.display = 'none';
-  startBtn.style.display = 'none';
-  revealBtn.style.display = 'none';
-  nextRoundBtn.style.display = 'none';
-  playerQuestionReveal.style.display = 'none';
-  questionDisplay.textContent = '';
-  playerQuestionReveal.textContent = '';
-  playerList.innerHTML = '';
-  nameInput.value = '';
-  gameCodeInput.value = '';
-  gameCode = '';
-  isHost = false;
-
-  localStorage.removeItem('playerName');
-  localStorage.removeItem('gameCode');
+// Player list update
+socket.on('playerListUpdate', (players) => {
+  const list = Object.values(players).map(p => `🧍 ${p.name || p.id.slice(0, 5)}`);
+  playerList.innerHTML = list.join('<br>');
 });
 
-// Show game area
+// Rejoin failed (optional)
+socket.on('rejoinFailed', () => {
+  rejoining = false;
+  alert("Failed to rejoin the game. Please re-enter your name.");
+  menu.style.display = 'block';
+  gameSection.style.display = 'none';
+});
+
+// Back to menu
+backBtn.addEventListener('click', () => {
+  if (!rejoining) {
+    menu.style.display = 'block';
+    gameSection.style.display = 'none';
+    startBtn.style.display = 'none';
+    revealBtn.style.display = 'none';
+    nextRoundBtn.style.display = 'none';
+    playerQuestionReveal.style.display = 'none';
+    questionDisplay.textContent = '';
+    playerQuestionReveal.textContent = '';
+    playerList.innerHTML = '';
+    nameInput.value = '';
+    gameCodeInput.value = '';
+    gameCode = '';
+    isHost = false;
+
+    localStorage.removeItem('playerName');
+    localStorage.removeItem('gameCode');
+  }
+});
+
+// Show game screen
 function showGameSection(text) {
   menu.style.display = 'none';
   gameSection.style.display = 'block';
   gameInfo.textContent = text;
 }
+
+socket.on('rejoinSuccess', ({ name, code, isHost: wasHost }) => {
+  rejoining = false;
+  gameCode = code;
+  isHost = wasHost;
+  gameSection.style.display = 'block';
+  menu.style.display = 'none';
+  gameInfo.textContent = `Rejoined game: ${code}`;
+
+  if (isHost) {
+    startBtn.style.display = 'inline-block';
+  }
+});
