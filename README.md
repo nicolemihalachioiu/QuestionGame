@@ -1,5 +1,5 @@
 # QuestionGame
-Question Game for Question and Answer
+Fun game to play with your friends when you're all together
 
 // node server.js
 
