@@ -83,18 +83,18 @@ module.exports = [
         player: "If you won the lottery what percent would you give to your parents?",
         imposter: "How much do you tip at a restaurant?"
     },
-    { //22
-        player: "What is the most amount of times you have masterbated in a day?",
-        imposter: "Pick a number from 1-30"
-    },
-    { //23
-        player: "Craziest place you've ever taken a shit?",
-        imposter: "Best place to relax?"
-    },
-    { //24
-        player: "Number of times you poop in a day?",
-        imposter: "Pick a number from 0-10"
-    },
+    // { //22 - Inappropriate content
+    //     player: "What is the most amount of times you have masterbated in a day?",
+    //     imposter: "Pick a number from 1-30"
+    // },
+    // { //23 - Inappropriate content
+    //     player: "Craziest place you've ever taken a shit?",
+    //     imposter: "Best place to relax?"
+    // },
+    // { //24 - Potentially TMI
+    //     player: "Number of times you poop in a day?",
+    //     imposter: "Pick a number from 0-10"
+    // },
     { //25
         player: "Pick a the best ship in the group",
         imposter: "What two people in the group hang out the least?"
@@ -135,4 +135,4 @@ module.exports = [
         player: "Who's the chillest person in the group?",
         imposter: "Who's the most dramatic person in the group?"
     }
-  ];
+];
