@@ -83,18 +83,18 @@ module.exports = [
         player: "If you won the lottery what percent would you give to your parents?",
         imposter: "How much do you tip at a restaurant?"
     },
-    // { //22 - Inappropriate content
-    //     player: "What is the most amount of times you have masterbated in a day?",
-    //     imposter: "Pick a number from 1-30"
-    // },
-    // { //23 - Inappropriate content
-    //     player: "Craziest place you've ever taken a shit?",
-    //     imposter: "Best place to relax?"
-    // },
-    // { //24 - Potentially TMI
-    //     player: "Number of times you poop in a day?",
-    //     imposter: "Pick a number from 0-10"
-    // },
+    { //22 - Inappropriate content
+        player: "What is the most amount of times you have masterbated in a day?",
+        imposter: "Pick a number from 1-30"
+    },
+    { //23 - Inappropriate content
+        player: "Craziest place you've ever taken a shit?",
+        imposter: "Best place to relax?"
+    },
+    { //24 - Potentially TMI
+        player: "Number of times you poop in a day?",
+        imposter: "Pick a number from 0-10"
+    },
     { //25
         player: "Pick a the best ship in the group",
         imposter: "What two people in the group hang out the least?"
@@ -134,5 +134,76 @@ module.exports = [
     { //34
         player: "Who's the chillest person in the group?",
         imposter: "Who's the most dramatic person in the group?"
+    },
+    { //35
+        player: "Which Gupta is ur fave?",
+        imposter: "Which Gupta is ur least fave?"
+    },
+    { //36
+        player: "How many people would you want at your wedding?",
+        imposter: "Pick a range from 20-100"
+    },
+    { //37
+        player: "If you could never use the internet again what would you miss the most?",
+        imposter: "What is the worst thing about the internet?"
+    },
+    { //38
+        player: "What celeb dead or alive would you want to have dinner with?",
+        imposter: "Which celeb are you afraid of?"
+    },
+    { //39
+        player: "What sport do you think you can go pro in?",
+        imposter: "What is the hardest sport to go pro in?"
+    },
+    { //40
+        player: "What would a book about your life be called?",
+        imposter: "What is an adjective that describes you?"
+    },{ //41
+        player: "If you could make an inanimate object come to life what would it be?",
+        imposter: "What is the best physical gift to get from your partner?"
+    },
+    { //42
+        player: "Rate your cooking skills from 0-10",
+        imposter: "Range from 0-10"
+    },
+    { //43
+        player: "How many gifts should you give a partner on Valentines Day?",
+        imposter: "Range from 0-10"
+    },
+    { //44
+        player: "What would your country music star name be?",
+        imposter: "What's your superhero name?"
+    },
+    { //45
+        player: "If you had to give up one sense which one you choose?",
+        imposter: "Pick one of the five senses?"
+    },
+    { //46
+        player: "What is your favourite food?",
+        imposter: "What is a food you want to try?"
+    },
+    { //47
+        player: "If you had to live in a fictional world which one would you choose?",
+        imposter: "What is the worst fictional world you could live in?"
+    },
+    { //48
+        player: "What is the best job to have?",
+        imposter: "What job would priya be really good at?"
+    },
+    { //49
+        player: "Dumbest reason to get into a fight?",
+        imposter: "What is your pet peeve?"
+    },
+    { //50
+        player: "What animal would you pick to be your best friend?",
+        imposter: "What is the most dangerous animal?"
+    },
+    { //51
+        player: "number of days you could go without pooping?",
+        imposter: "Range from 0-10"
+    },
+    { //52
+        player: "What age is perfect to get engaged?",
+        imposter: "Pick a number from 17-40"
     }
 ];
